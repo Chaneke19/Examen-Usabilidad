@@ -3,11 +3,15 @@ using UnityEngine;
 
 public class StarCollectible : MonoBehaviour
 {
+    [Header("Efecto al Aparecer (Spawn)")]
+    [Tooltip("Prefab del efecto de partículas o aura que acompañará a la estrella")]
+    public GameObject spawnEffect;
+
     [Header("Efectos al Recoger")]
     [Tooltip("¿Esta estrella cuenta para el objetivo de desbloquear el diamante?")]
     public bool countsAsStar = true;
 
-    [Tooltip("Prefab del efecto de animación o partículas (ej. de Cartoon FX)")]
+    [Tooltip("Prefab del efecto de animación o partículas al recoger (ej. de Cartoon FX)")]
     public GameObject collectEffectPrefab;
 
     [Tooltip("Sonido opcional al recoger la estrella")]
@@ -26,10 +30,19 @@ public class StarCollectible : MonoBehaviour
 
     private Vector3 startPos;
     private bool isCollected = false;
+    private GameObject activeSpawnEffect;
 
     private void Start()
     {
         startPos = transform.position;
+
+        // 1. Instanciar el efecto COMO HIJO de la estrella para que la siga
+        if (spawnEffect != null)
+        {
+            activeSpawnEffect = Instantiate(spawnEffect, transform);
+            activeSpawnEffect.transform.localPosition = Vector3.zero;
+            activeSpawnEffect.transform.localRotation = Quaternion.identity;
+        }
     }
 
     private void Update()
@@ -74,19 +87,32 @@ public class StarCollectible : MonoBehaviour
         Collider col = GetComponent<Collider>();
         if (col != null) col.enabled = false;
 
-        // 1. Instanciar el efecto de partículas / animación (si fue asignado)
+        // 1. Eliminar el efecto de spawn/aura en loop para que no se quede flotando
+        if (activeSpawnEffect != null)
+        {
+            Destroy(activeSpawnEffect);
+        }
+
+        // Detener y limpiar cualquier partícula hija que esté en loop
+        ParticleSystem[] childParticles = GetComponentsInChildren<ParticleSystem>();
+        foreach (var ps in childParticles)
+        {
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        }
+
+        // 2. Instanciar el efecto de impacto/recogida en el mundo
         if (collectEffectPrefab != null)
         {
             Instantiate(collectEffectPrefab, transform.position, Quaternion.identity);
         }
 
-        // 2. Reproducir sonido (si fue asignado)
+        // 3. Reproducir sonido (si fue asignado)
         if (collectSound != null)
         {
             AudioSource.PlayClipAtPoint(collectSound, transform.position);
         }
 
-        // 3. Ejecutar animación de desaparición o destruir directamente
+        // 4. Ejecutar animación de desaparición o destruir directamente
         if (shrinkOnCollect)
         {
             StartCoroutine(ShrinkAndDestroy());
